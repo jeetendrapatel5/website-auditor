@@ -29,9 +29,9 @@ export default function AuditInput() {
     return (
         <div className="w-full max-w-xl mx-auto space-y-3 flex justify-center flex-col items-center">
             <div className="flex gap-2">
-                <Input placeholder="Enter your website URL" className="lg:w-100 md:w-72 sm:w-64 mb-4"
+                <Input placeholder="Enter your website URL" className="lg:w-100 md:w-72 sm:w-64 mb-4 bg-zinc-800"
                     value={url} onChange={(e) => setUrl(e.target.value)} />
-                <Button onClick={handleSubmit} className='dark:bg-white dark:text-zinc-900 lg:w-25 md:w-20 sm:w-15'>Audit</Button>
+                <Button onClick={handleSubmit} className='dark:bg-white dark:text-zinc-900 lg:w-25 md:w-20 sm:w-15 cursor-pointer hover:bg-zinc-400 hover:text-zinc-200'>Audit</Button>
             </div>
             {error && <p className="text-red-500 text-sm">{error}</p>}
         </div>
