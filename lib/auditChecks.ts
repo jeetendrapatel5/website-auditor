@@ -251,3 +251,51 @@ function calculateScores(issues: Issue[]) {
     accessibility,
   };
 }
+
+// Export function to compare two audit reports
+export function compareAuditReports(
+  oldReport: AuditReport | null,
+  newReport: AuditReport
+): {
+  hasChanges: boolean
+  changes: string[]
+} {
+  if (!oldReport) {
+    return { hasChanges: false, changes: [] }
+  }
+
+  const changes: string[] = []
+
+  // Check score changes
+  const scoreDiff = newReport.overallScore - oldReport.overallScore
+  if (Math.abs(scoreDiff) >= 5) {
+    changes.push(`Overall score ${scoreDiff > 0 ? 'increased' : 'decreased'} by ${Math.abs(scoreDiff)} points`)
+  }
+
+  // Check new issues
+  const newIssues = newReport.issues.filter(
+    newIssue => !oldReport.issues.some(
+      oldIssue => oldIssue.problem === newIssue.problem
+    )
+  )
+
+  if (newIssues.length > 0) {
+    changes.push(`${newIssues.length} new issue(s) detected`)
+  }
+
+  // Check resolved issues
+  const resolvedIssues = oldReport.issues.filter(
+    oldIssue => !newReport.issues.some(
+      newIssue => newIssue.problem === oldIssue.problem
+    )
+  )
+
+  if (resolvedIssues.length > 0) {
+    changes.push(`${resolvedIssues.length} issue(s) resolved`)
+  }
+
+  return {
+    hasChanges: changes.length > 0,
+    changes
+  }
+}
