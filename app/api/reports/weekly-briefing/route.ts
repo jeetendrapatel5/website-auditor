@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { supabaseServer } from '@/lib/supabase'
 import { AIAnalyzer } from '@/lib/ai-analyzer'
+import { authOptions } from '@/lib/auth'
 
 export async function POST() {
   const session = await getServerSession()

@@ -1,10 +1,10 @@
-import NextAuth from "next-auth"
+import NextAuth, { type AuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { supabaseServer } from "@/lib/supabase"
 import bcrypt from "bcryptjs"
-import type { NextAuthOptions } from "next-auth"
 
-export const authOptions: NextAuthOptions = {
+// ✅ Define and export authOptions
+export const authOptions: AuthOptions = {
   providers: [
     CredentialsProvider({
       name: "Credentials",
@@ -15,19 +15,15 @@ export const authOptions: NextAuthOptions = {
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null
 
-        const { data: user } = await supabaseServer
+        const { data: user, error } = await supabaseServer
           .from("users")
           .select("*")
           .eq("email", credentials.email)
           .single()
 
-        if (!user) return null
+        if (error || !user) return null
 
-        const isValid = await bcrypt.compare(
-          credentials.password,
-          user.password_hash
-        )
-
+        const isValid = await bcrypt.compare(credentials.password, user.password_hash)
         if (!isValid) return null
 
         return {
@@ -38,7 +34,12 @@ export const authOptions: NextAuthOptions = {
       },
     }),
   ],
-  session: { strategy: "jwt" },
+  pages: {
+    signIn: "/auth/signin",
+  },
+  session: {
+    strategy: "jwt",
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) token.id = user.id
@@ -51,5 +52,6 @@ export const authOptions: NextAuthOptions = {
   },
 }
 
+// ✅ Export the NextAuth handler for app router
 const handler = NextAuth(authOptions)
 export { handler as GET, handler as POST }

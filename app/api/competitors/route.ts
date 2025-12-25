@@ -1,13 +1,11 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth' // ✅ Import authOptions
 import { supabaseServer } from '@/lib/supabase'
-
-export const runtime = "nodejs"
-
 
 // Get user's competitors
 export async function GET(req: Request) {
-  const session = await getServerSession()
+  const session = await getServerSession(authOptions) // ✅ Pass authOptions
   
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -29,7 +27,7 @@ export async function GET(req: Request) {
 
 // Add new competitor
 export async function POST(req: Request) {
-  const session = await getServerSession()
+  const session = await getServerSession(authOptions) // ✅ Pass authOptions
   
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

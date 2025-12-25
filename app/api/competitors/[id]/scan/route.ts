@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { supabaseServer } from '@/lib/supabase'
 import { performAudit } from '@/lib/auditChecks'
 import { AIAnalyzer } from '@/lib/ai-analyzer'
+import { authOptions } from '@/lib/auth'
 
 export const runtime = "nodejs"
 
@@ -11,7 +12,7 @@ export async function POST(
   req: Request,
   { params }: { params: { id: string } }
 ) {
-  const session = await getServerSession()
+  const session = await getServerSession(authOptions)
   
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
