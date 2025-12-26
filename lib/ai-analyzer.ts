@@ -1,131 +1,77 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from '@google/generative-ai';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!)
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
 export class AIAnalyzer {
-  private model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
+  /**
+   * UPDATED FOR DEC 2025:
+   * 'gemini-3-flash' is now the standard for fast, low-cost tasks.
+   * 'gemini-2.5-flash' is the stable fallback.
+   */
+  private model = genAI.getGenerativeModel({ model: 'gemini-3-flash' });
+  private fallbackModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-  async analyzeCompetitorChange(
-    competitorName: string,
-    oldAudit: any,
-    newAudit: any
-  ) {
+  async analyzeCompetitorChange(competitorName: string, oldAudit: any, newAudit: any) {
     const prompt = `You are a competitive intelligence analyst.
-
-Competitor: ${competitorName}
-
-OLD AUDIT SCORES:
-- Overall: ${oldAudit.overallScore}/100
-- SEO: ${oldAudit.seoScore}/100
-- Performance: ${oldAudit.performanceScore}/100
-- Accessibility: ${oldAudit.accessibilityScore}/100
-- Issues: ${oldAudit.issues.length}
-
-NEW AUDIT SCORES:
-- Overall: ${newAudit.overallScore}/100
-- SEO: ${newAudit.seoScore}/100
-- Performance: ${newAudit.performanceScore}/100
-- Accessibility: ${newAudit.accessibilityScore}/100
-- Issues: ${newAudit.issues.length}
-
-OLD ISSUES:
-${oldAudit.issues.map((i: any) => `- ${i.problem} (${i.severity})`).join('\n')}
-
-NEW ISSUES:
-${newAudit.issues.map((i: any) => `- ${i.problem} (${i.severity})`).join('\n')}
-
-Analyze what changed and provide strategic insights.
-
-Respond ONLY with valid JSON in this exact format:
-{
-  "hasSignificantChange": true/false,
-  "changeType": "improvement|decline|mixed",
-  "severity": "critical|important|minor",
-  "title": "Brief title of the change",
-  "description": "What changed and why it matters",
-  "impactEstimate": 0,
-  "recommendedAction": "Specific action to take in response",
-  "opportunities": "How you can exploit this"
-}
-
-If no significant change (score diff <5 points), set hasSignificantChange to false.`
+    Competitor: ${competitorName}
+    OLD SCORES: Overall ${oldAudit.overallScore}, SEO ${oldAudit.seoScore}, Perf ${oldAudit.performanceScore}
+    NEW SCORES: Overall ${newAudit.overallScore}, SEO ${newAudit.seoScore}, Perf ${newAudit.performanceScore}
+    
+    Respond ONLY with valid JSON:
+    {
+      "hasSignificantChange": boolean,
+      "changeType": "improvement|decline|mixed",
+      "severity": "critical|important|minor",
+      "title": "string",
+      "description": "string",
+      "impactEstimate": number,
+      "recommendedAction": "string",
+      "opportunities": "string"
+    }`;
 
     try {
-      const result = await this.model.generateContent(prompt)
-      const response = result.response.text()
+      // Try primary model first
+      let result = await this.model.generateContent(prompt).catch(() => this.fallbackModel.generateContent(prompt));
+      const response = await result.response;
+      const text = response.text();
       
-      // Clean response
-      const cleaned = response.replace(/```json\n?|\n?```/g, '').trim()
-      const parsed = JSON.parse(cleaned)
-      
-      return parsed
+      const cleaned = text.replace(/```json\n?|\n?```/g, '').trim();
+      return JSON.parse(cleaned);
     } catch (error) {
-      console.error('AI analysis error:', error)
-      return {
-        hasSignificantChange: false,
-        changeType: 'mixed',
-        severity: 'minor',
-        title: 'Change detected',
-        description: 'Unable to analyze changes automatically',
-        impactEstimate: 0,
-        recommendedAction: 'Review changes manually',
-        opportunities: 'Monitor for further changes'
-      }
+      console.error('AI Analysis Error:', error);
+      return { hasSignificantChange: false, title: 'Analysis Error', description: 'Could not parse changes.' };
     }
   }
 
-  async generateWeeklyBriefing(
-    projectName: string,
-    competitors: any[]
-  ): Promise<string> {
+  async generateWeeklyBriefing(projectName: string, competitors: any[]): Promise<string> {
     if (!competitors || competitors.length === 0) {
-      return `# Weekly Intelligence Briefing
-
-**Project:** ${projectName}
-**Period:** Past 7 days
-**Status:** ✅ All Quiet
-
-No competitors being tracked yet. Add competitors to start receiving intelligence.`
+      return `# Weekly Intelligence Briefing\n\n**Project:** ${projectName}\n**Status:** ✅ All Quiet\nNo competitors tracked.`;
     }
 
     const competitorSummaries = competitors.map(comp => {
-      const recentChanges = comp.changes?.slice(0, 3) || []
-      return `
-**${comp.name}** (${comp.domain})
-- Changes this week: ${recentChanges.length}
-${recentChanges.map((c: any) => `  - ${c.title}: ${c.description}`).join('\n')}
-`
-    }).join('\n')
+      const recentChanges = comp.changes?.slice(0, 3) || [];
+      return `**${comp.name}** (${comp.domain})\n${recentChanges.map((c: any) => `- ${c.title}: ${c.description}`).join('\n')}`;
+    }).join('\n');
 
-    const prompt = `You are a CMO's executive assistant creating a Monday morning briefing.
-
-Project: ${projectName}
-
-COMPETITOR ACTIVITY (Past 7 Days):
-${competitorSummaries}
-
-Create a strategic 4-section briefing in markdown:
-
-## 🚨 THREAT ASSESSMENT
-Rate overall threat level (🔴 RED / 🟡 YELLOW / 🟢 GREEN) and explain why.
-
-## 📊 KEY MOVES THIS WEEK
-Highlight 2-3 most important changes with strategic context.
-
-## ⚔️ COUNTER-ATTACK PLAN
-Provide 3 specific, prioritized actions with expected outcomes.
-
-## 💡 OPPORTUNITIES SPOTTED
-Where are competitors weak? What can we exploit?
-
-Be concise, strategic, and actionable. Use business language, not technical jargon.`
+    const prompt = `You are a CMO's executive assistant. Create a strategic 4-section briefing in markdown for project: ${projectName}.
+    
+    COMPETITOR DATA:
+    ${competitorSummaries}
+    
+    Format:
+    ## 🚨 THREAT ASSESSMENT
+    ## 📊 KEY MOVES THIS WEEK
+    ## ⚔️ COUNTER-ATTACK PLAN
+    ## 💡 OPPORTUNITIES SPOTTED`;
 
     try {
-      const result = await this.model.generateContent(prompt)
-      return result.response.text()
-    } catch (error) {
-      console.error('Briefing generation error:', error)
-      return 'Unable to generate briefing. Please try again later.'
+      // Use fallback if gemini-3-flash is still rolling out to your key
+      const result = await this.model.generateContent(prompt).catch(() => this.fallbackModel.generateContent(prompt));
+      const response = await result.response;
+      return response.text();
+    } catch (error: any) {
+      console.error('Briefing generation error:', error);
+      return `## Briefing Unavailable\nAI Error: ${error.message}. Please check your API key in Google AI Studio.`;
     }
   }
 }
